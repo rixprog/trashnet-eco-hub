@@ -13,48 +13,118 @@ import {
   Target
 } from 'lucide-react'
 
+// Import React hooks for state and effects, and react-query
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+
+// Assuming your backend URL
+const API_BASE_URL = 'http://localhost:8000'; // Make sure this matches your FastAPI server
+
+// Define the interface for the data received from the backend
+interface UserCreditsResponse {
+  user_id: string;
+  credits: number;
+  recycled_items: Array<{
+    category: string;
+    item_name: string;
+    timestamp: string;
+    bin_id: string;
+    credits: number; // ADDED: Now includes the credits for this specific item
+  }>;
+}
+
+// Function to fetch data from your FastAPI backend
+const fetchUserCredits = async (userId: string): Promise<UserCreditsResponse> => {
+  const response = await fetch(`${API_BASE_URL}/user-credits/${userId}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch user credits');
+  }
+  return response.json();
+};
+
 const Dashboard = () => {
+  // Hardcode user ID for demo. In a real app, this would come from auth context.
+  const userId = 'user1'; 
+
+  // Use react-query to fetch and manage data
+  const { data, isLoading, error } = useQuery<UserCreditsResponse>({
+    queryKey: ['userCredits', userId],
+    queryFn: () => fetchUserCredits(userId),
+    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
+  });
+
+  // Handle loading and error states
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <p>Loading dashboard data...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex justify-center items-center min-h-screen text-red-500">
+        <p>Error loading dashboard: {error.message}</p>
+      </div>
+    );
+  }
+
+  // Calculate real-time stats based on fetched data
+  const ecoCreditsBalance = data?.credits || 0;
+  const totalItemsRecycled = data?.recycled_items?.length || 0;
+  // Example CO2 saved: 0.5 kg per item. Adjust as per your logic.
+  const co2Saved = (totalItemsRecycled * 0.5).toFixed(2); 
+
+  // Updated stats array to use real data
   const stats = [
     {
       title: "EcoCredits Balance",
-      value: "2,847",
+      value: ecoCreditsBalance.toLocaleString(), // Format number with commas
       icon: Coins,
-      description: "+247 this month",
-      trend: "+12%",
+      description: "+247 this month", // This is still mock data, as backend doesn't provide this delta
+      trend: "+12%", // This is still mock data
       color: "text-success"
     },
     {
       title: "Items Recycled",
-      value: "156",
+      value: totalItemsRecycled.toLocaleString(), // Use real count
       icon: Recycle,
       description: "This month",
-      trend: "+8%",
+      trend: "+8%", // This is still mock data
       color: "text-primary"
     },
     {
       title: "CO₂ Saved",
-      value: "48.2 kg",
+      value: `${co2Saved} kg`, // Use real calculated value
       icon: Leaf,
       description: "Environmental impact",
-      trend: "+15%",
+      trend: "+15%", // This is still mock data
       color: "text-accent"
     },
     {
       title: "Achievement Rank",
-      value: "#127",
+      value: "#127", // This is still mock data
       icon: Award,
       description: "In your area",
-      trend: "↑23",
+      trend: "↑23", // This is still mock data
       color: "text-warning"
     }
   ]
 
-  const recentActivities = [
-    { type: "Plastic Bottle", credits: 15, time: "2 hours ago", location: "Bin #A01" },
-    { type: "Aluminum Can", credits: 20, time: "5 hours ago", location: "Bin #B03" },
-    { type: "Paper", credits: 10, time: "1 day ago", location: "Bin #A01" },
-    { type: "Glass Bottle", credits: 25, time: "2 days ago", location: "Bin #C05" },
-  ]
+  // Use the actual recycled items from the backend for recent activities
+  // Slice to show only the last 4 items (or whatever quantity fits your UI)
+  const recentActivities = data?.recycled_items
+    ?.slice(-4) // Get last 4 items
+    .reverse() // Show most recent first
+    .map(item => ({
+      type: item.item_name || item.category, // Use specific item name, fallback to category
+      credits: item.credits, // CHANGED THIS: Use the actual credits from the item data
+      time: new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), // Format time
+      location: `Bin #${item.bin_id}` // Use actual bin ID
+    })) || [];
+
 
   const availableSchemes = [
     { name: "Bus Pass Discount", credits: 500, discount: "20% off", category: "Transport" },
@@ -62,6 +132,11 @@ const Dashboard = () => {
     { name: "Movie Ticket", credits: 1200, discount: "Buy 1 Get 1", category: "Entertainment" },
     { name: "Plant a Tree", credits: 300, discount: "Certificate", category: "Environment" },
   ]
+
+  // Monthly Goal
+  const monthlyGoalTarget = 200; // Hardcoded goal
+  const monthlyGoalProgress = Math.min(100, (totalItemsRecycled / monthlyGoalTarget) * 100);
+  const itemsRemainingForGoal = Math.max(0, monthlyGoalTarget - totalItemsRecycled);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -111,21 +186,25 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {recentActivities.map((activity, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 bg-secondary/30 rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-2 h-2 bg-primary rounded-full"></div>
-                      <div>
-                        <p className="font-medium">{activity.type}</p>
-                        <p className="text-sm text-muted-foreground">{activity.location}</p>
+                {recentActivities.length > 0 ? (
+                  recentActivities.map((activity, index) => (
+                    <div key={index} className="flex items-center justify-between p-4 bg-secondary/30 rounded-lg">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-2 h-2 bg-primary rounded-full"></div>
+                        <div>
+                          <p className="font-medium">{activity.type}</p>
+                          <p className="text-sm text-muted-foreground">{activity.location}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-success">+{activity.credits} credits</p>
+                        <p className="text-xs text-muted-foreground">{activity.time}</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-success">+{activity.credits} credits</p>
-                      <p className="text-xs text-muted-foreground">{activity.time}</p>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-muted-foreground text-center py-4">No recent recycling activity yet.</p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -144,13 +223,14 @@ const Dashboard = () => {
               <div className="space-y-4">
                 <div>
                   <div className="flex justify-between text-sm mb-2">
-                    <span>156 / 200 items</span>
-                    <span>78%</span>
+                    {/* Use real-time items recycled */}
+                    <span>{totalItemsRecycled} / {monthlyGoalTarget} items</span>
+                    <span>{monthlyGoalProgress.toFixed(0)}%</span>
                   </div>
-                  <Progress value={78} className="h-2" />
+                  <Progress value={monthlyGoalProgress} className="h-2" />
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  44 more items to reach your monthly goal and earn a bonus!
+                  {itemsRemainingForGoal} more items to reach your monthly goal and earn a bonus!
                 </p>
               </div>
             </CardContent>
@@ -162,6 +242,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
+                {/* These are still hardcoded as no backend data for them */}
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Trees Saved</span>
                   <span className="font-semibold">12.3</span>
@@ -198,8 +279,9 @@ const Dashboard = () => {
                 </div>
                 <h4 className="font-semibold mb-2">{scheme.name}</h4>
                 <p className="text-sm text-success mb-3">{scheme.discount}</p>
-                <Button size="sm" className="w-full" disabled={2847 < scheme.credits}>
-                  {2847 >= scheme.credits ? 'Claim Now' : 'Need More Credits'}
+                {/* Use ecoCreditsBalance for the disabled state check */}
+                <Button size="sm" className="w-full" disabled={ecoCreditsBalance < scheme.credits}>
+                  {ecoCreditsBalance >= scheme.credits ? 'Claim Now' : 'Need More Credits'}
                 </Button>
               </div>
             ))}

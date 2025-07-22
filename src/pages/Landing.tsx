@@ -100,7 +100,7 @@ const Landing = () => {
                 </Button>
               </NavLink>
               <NavLink to="/map">
-                <Button size="lg" variant="outline" className="border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 px-8 py-4 text-lg">
+                <Button size="lg" variant="outline" className="border-primary-foreground/30 text-primary hover:bg-primary-foreground/10 px-8 py-4 text-lg">
                   Find Bins Near Me
                   <MapPin className="ml-2 h-5 w-5" />
                 </Button>
@@ -248,7 +248,8 @@ const Landing = () => {
                 </Button>
               </NavLink>
               <NavLink to="/admin">
-                <Button size="lg" variant="outline" className="border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 px-8 py-4 text-lg">
+                {/* CORRECTED: Added text-primary for visibility */}
+                <Button size="lg" variant="outline" className="border-primary-foreground/30 text-primary hover:bg-primary-foreground/10 px-8 py-4 text-lg">
                   <Shield className="mr-2 h-5 w-5" />
                   Municipality Portal
                 </Button>

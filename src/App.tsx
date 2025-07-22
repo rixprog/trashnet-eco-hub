@@ -10,6 +10,7 @@ import Chat from "./components/Chat";
 import Admin from "./components/Admin";
 import Layout from "./components/Layout";
 import NotFound from "./pages/NotFound";
+import UploadTrash from "./pages/UploadTrash";
 
 const queryClient = new QueryClient();
 
@@ -25,6 +26,7 @@ const App = () => (
           <Route path="/map" element={<Layout><Map /></Layout>} />
           <Route path="/chat" element={<Layout><Chat /></Layout>} />
           <Route path="/admin" element={<Layout><Admin /></Layout>} />
+          <Route path="/upload-trash" element={<Layout><UploadTrash /></Layout>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

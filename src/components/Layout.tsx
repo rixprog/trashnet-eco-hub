@@ -9,7 +9,8 @@ import {
   Leaf,
   Menu,
   X,
-  Shield
+  Shield,
+  Recycle
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -23,6 +24,7 @@ const Layout = ({ children }: LayoutProps) => {
 
   const navItems = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+    { name: 'Upload Trash', path: '/upload-trash', icon: Recycle },
     { name: 'Find Bins', path: '/map', icon: MapPin },
     { name: 'AI Assistant', path: '/chat', icon: MessageCircle },
     { name: 'Admin Panel', path: '/admin', icon: Shield },
@@ -122,7 +124,7 @@ const Layout = ({ children }: LayoutProps) => {
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
-              © 2024 TrashNet. Building a sustainable future.
+              © 2025 TrashNet. Building a sustainable future.
             </p>
           </div>
         </div>

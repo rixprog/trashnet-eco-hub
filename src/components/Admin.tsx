@@ -14,22 +14,32 @@ import {
   BarChart3,
   AlertTriangle,
   CheckCircle,
-  Clock
+  Clock,
+  Wifi, // Added for connection status
+  WifiOff // Added for connection status
 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'; // Added for fetching real-time data
+import { Progress } from '@/components/ui/progress'; // Added for fill level progress bar
 
+// Updated BinData interface to match backend AdminBinData model
 interface BinData {
   id: string
   name: string
   location: string
   lat: number
   lng: number
-  status: 'active' | 'full' | 'maintenance'
-  fillLevel: number
+  status: 'active' | 'full' | 'maintenance' // Derived from fillLevel in backend
+  fillLevel: number // Percentage 0-100
   lastEmptied: string
   totalCollections: number
+  connection_status: 'online' | 'offline'; // New: Connection status from backend
+  last_seen_timestamp: number; // New: Unix timestamp from backend
 }
 
+const API_BASE_URL = 'http://localhost:8000'; // Define API base URL
+
 const Admin = () => {
+  // Your original static bins data (UNCHANGED)
   const [bins, setBins] = useState<BinData[]>([
     {
       id: 'A01',
@@ -75,6 +85,15 @@ const Admin = () => {
 
   const { toast } = useToast()
 
+  // --- NEW: Fetch real-time bin data from backend ---
+  const { data: fetchedBins, isLoading: isFetchingBins, error: fetchError } = useQuery<Record<string, BinData>>({
+    queryKey: ['adminRealtimeBins'],
+    queryFn: () => fetch(`${API_BASE_URL}/admin/bins-data`).then(res => res.json()),
+    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
+  });
+  const fetchedBinsArray = fetchedBins ? Object.values(fetchedBins) : [];
+  // --- END NEW ---
+
   const handleAddBin = () => {
     if (!newBin.name || !newBin.location || !newBin.lat || !newBin.lng) {
       toast({
@@ -96,7 +115,9 @@ const Admin = () => {
       status: 'active',
       fillLevel: 0,
       lastEmptied: 'Just added',
-      totalCollections: 0
+      totalCollections: 0,
+      connection_status: 'online', // Default for newly added
+      last_seen_timestamp: Math.floor(Date.now() / 1000) // Default for newly added
     }
 
     setBins([...bins, bin])
@@ -137,12 +158,25 @@ const Admin = () => {
     }
   }
 
+  // --- NEW: Helper to get connection icon ---
+  const getConnectionIcon = (status: BinData['connection_status']) => {
+    switch (status) {
+      case 'online':
+        return <Wifi className="h-4 w-4 text-success" />;
+      case 'offline':
+        return <WifiOff className="h-4 w-4 text-muted-foreground" />;
+      default:
+        return null;
+    }
+  };
+  // --- END NEW ---
+
   const overviewStats = {
     totalBins: bins.length,
     activeBins: bins.filter(b => b.status === 'active').length,
     fullBins: bins.filter(b => b.status === 'full').length,
     maintenanceBins: bins.filter(b => b.status === 'maintenance').length,
-    avgFillLevel: Math.round(bins.reduce((acc, bin) => acc + bin.fillLevel, 0) / bins.length),
+    avgFillLevel: bins.length > 0 ? Math.round(bins.reduce((acc, bin) => acc + bin.fillLevel, 0) / bins.length) : 0,
     totalCollections: bins.reduce((acc, bin) => acc + bin.totalCollections, 0)
   }
 
@@ -164,7 +198,7 @@ const Admin = () => {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          {/* Stats Grid */}
+          {/* Stats Grid (UNCHANGED) */}
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
             <Card className="shadow-card">
               <CardContent className="p-4 text-center">
@@ -183,7 +217,7 @@ const Admin = () => {
             <Card className="shadow-card">
               <CardContent className="p-4 text-center">
                 <AlertTriangle className="h-8 w-8 text-warning mx-auto mb-2" />
-                <p className="text-2xl font-bold">{overviewStats.fullBins}</p>
+                <p className className="text-2xl font-bold">{overviewStats.fullBins}</p>
                 <p className="text-xs text-muted-foreground">Full</p>
               </CardContent>
             </Card>
@@ -210,7 +244,7 @@ const Admin = () => {
             </Card>
           </div>
 
-          {/* Recent Alerts */}
+          {/* Recent Alerts (UNCHANGED) */}
           <Card className="shadow-card">
             <CardHeader>
               <CardTitle>Recent Alerts</CardTitle>
@@ -406,6 +440,57 @@ const Admin = () => {
           </Card>
         </TabsContent>
       </Tabs>
+      
+      {/* --- NEW: Real-time Bin Sensor Data Section --- */}
+      <Card className="shadow-card mt-8">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Settings className="h-5 w-5 text-primary" />
+            <span>Real-time Bin Sensor Data</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isFetchingBins && <div className="text-center py-4">Loading real-time bin data...</div>}
+          {fetchError && <div className="text-center py-4 text-destructive">Error fetching real-time data: {fetchError.message}</div>}
+          {!isFetchingBins && !fetchError && fetchedBinsArray.length === 0 && (
+            <div className="text-center py-4 text-muted-foreground">No real-time bin data available.</div>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {fetchedBinsArray.map((bin) => (
+              <Card key={`realtime-${bin.id}`} className="p-4 shadow-sm">
+                <CardHeader className="flex flex-row items-center justify-between p-0 mb-3">
+                  <CardTitle className="text-lg font-semibold">{bin.name}</CardTitle>
+                  <Badge variant="outline">{bin.id}</Badge>
+                </CardHeader>
+                <CardContent className="p-0 text-sm space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-1">
+                      {getConnectionIcon(bin.connection_status)}
+                      <span className={`font-medium ${bin.connection_status === 'offline' ? 'text-muted-foreground' : 'text-success'}`}>
+                        {bin.connection_status.charAt(0).toUpperCase() + bin.connection_status.slice(1)}
+                      </span>
+                    </div>
+                    {/* Display actual bin status as derived in backend */}
+                    <Badge variant={getStatusColor(bin.status)}>
+                      {bin.status.charAt(0).toUpperCase() + bin.status.slice(1)}
+                    </Badge>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Fill Level</Label>
+                    <Progress value={bin.fillLevel} className="h-2" />
+                    <span className="text-xs text-muted-foreground mt-1 block">{bin.fillLevel}% Full</span>
+                  </div>
+                  <div className="flex items-center text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3 mr-1" />
+                    <span>Last Updated: {new Date(bin.last_seen_timestamp * 1000).toLocaleString()}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+      {/* --- END NEW Section --- */}
     </div>
   )
 }
