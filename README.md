@@ -27,9 +27,8 @@ cd trashnet-eco-hub
 
 npm install
 
-npm run dev
 
-### 2. Backend installation
+## 2. Backend installation
 
 cd waste-detection-backend
 
@@ -41,11 +40,11 @@ Create a .env file inside the waste-detection-backend directory and add your Gem
 
 GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
 
-### 3. Running the project
+## 3. Running the project
 
 Use three separate terminals to run the services concurrently.
 
-### Terminal 1 – Run the Backend Server
+## Terminal 1 – Run the Backend Server
 
 cd waste-detection-backend
 
@@ -55,7 +54,7 @@ uvicorn main:app --reload
 
 This starts the FastAPI backend at: http://localhost:8000
 
-### Terminal 2 – Run the Arduino Gateway Simulator
+## Terminal 2 – Run the Arduino Gateway Simulator
 
 cd waste-detection-backend
 
@@ -65,7 +64,7 @@ python arduino_gateway.py --bin_id A01
 
 You can run this command with different --bin_id values in multiple terminals (e.g., A01, B03, C02) to simulate multiple bins.
 
-### Terminal 3 – Run the React Frontend
+## Terminal 3 – Run the React Frontend
 
 From the root project directory:
 
