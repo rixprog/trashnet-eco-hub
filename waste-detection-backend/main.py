@@ -1,8 +1,9 @@
+# main.py
 from fastapi import FastAPI, HTTPException, Response, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import Dict, Union
+from typing import Dict, Union, List # Import List for recycled_items type hint
 import random
 import cv2
 import threading
@@ -256,7 +257,7 @@ def classify_image(file: UploadFile = File(...)):
     try:
         img_bytes = file.file.read()
         
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.0-flash")
         prompt = "Analyze the waste item in the image. Respond in JSON format with two keys: 'category' (classify as plastic, metal, glass, paper, or wood) and 'item_name' (a specific name for the item, e.g., 'plastic bottle', 'aluminum can', 'cardboard box')."
         
         response = model.generate_content([
@@ -364,3 +365,62 @@ def get_admin_bins_data():
         )
     print(f"Serving admin bins data. Current status of bins: { {id: {'fillLevel': bin['fillLevel'], 'status': bin['status'], 'connection_status': bin['connection_status']} for id, bin in bins_data.items()} }")
     return response_data
+
+# NEW: Endpoint for Gemini chat
+class GeminiChatRequest(BaseModel):
+    user_id: str
+    message: str
+
+class GeminiChatResponse(BaseModel):
+    response: str
+
+@app.post("/chat/gemini-query", response_model=GeminiChatResponse)
+async def gemini_chat_query(request: GeminiChatRequest):
+    user_id = request.user_id
+    user_message = request.message
+
+    # Gather real-time data
+    user_data = users.get(user_id, {"credits": 0, "recycled_items": []})
+    all_bins = list(bins_data.values()) # Use bins_data directly
+
+    # Construct a comprehensive prompt
+    context_prompt = (
+        f"You are an AI assistant for TrashNet, a smart waste management system. "
+        f"You have access to real-time user and bin data. "
+        f"The current user is '{user_id}'.\n\n"
+        f"--- User Data ---\n"
+        f"EcoCredits: {user_data['credits']}\n"
+        f"Recycled Items (last 5): {user_data['recycled_items'][-5:] if user_data['recycled_items'] else 'None'}\n\n"
+        f"--- Bin Data ---\n"
+        f"Here is a list of all smart trash bins and their current status:\n"
+    )
+    for bin in all_bins:
+        context_prompt += (
+            f"- Bin ID: {bin['id']}, Name: {bin['name']}, Location: {bin['location']}, "
+            f"Fill Level: {bin['fillLevel']}%, Status: {bin['status']}, "
+            f"Connection: {bin['connection_status']}, "
+            f"Last Seen: {datetime.fromtimestamp(int(bin['last_seen'])).strftime('%Y-%m-%d %H:%M:%S UTC')}\n"
+        )
+    context_prompt += "\n"
+
+    # Add general knowledge about the system
+    context_prompt += (
+        f"--- System Information ---\n"
+        f"Waste categories supported: {', '.join(CATEGORIES)}. "
+        f"Users earn EcoCredits for recycling. Credits can be used for rewards. "
+        f"Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S IST')}. " # Add current time
+        f"Current location: Kochi, Kerala, India.\n\n" # Add current location
+        f"--- User Query ---\n"
+        f"Based on the above information and your general knowledge, please answer the following question clearly and concisely:\n"
+        f"User: {user_message}\n\n"
+        f"Assistant:"
+    )
+
+    try:
+        model = genai.GenerativeModel("gemini-2.0-flash")
+        chat_response = model.generate_content(context_prompt)
+        response_text = chat_response.text if hasattr(chat_response, 'text') else str(chat_response)
+        return {"response": response_text}
+    except Exception as e:
+        print(f"Error calling Gemini API: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get response from AI assistant.")
